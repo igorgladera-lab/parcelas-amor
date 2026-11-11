@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#038554">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Minhas Parcelas">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Minhas Parcelas</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23038554'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle'%3E%F0%9F%92%B0%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="icon-192.png">
+
+<!-- Aplica tema ANTES do CSS pintar -->
+<script>
+(function(){
+  try {
+    var t = localStorage.getItem('parcelas_tema');
+    if (!t) {
+      t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'escuro' : 'claro';
+    }
+    document.documentElement.setAttribute('data-tema', t);
+  } catch(e) {
+    document.documentElement.setAttribute('data-tema', 'claro');
+  }
+})();
+</script>
+
+<style>
+  :root {
+    --primaria: #038554;
+    --primaria-escura: #005227;
+    --primaria-clara: #68DDBD;
+    
+    --cinza-borda: #d1d5db;
+    --cinza-texto: #4b5563;
+    --cinza-fundo: #f0fdfa;
+    --branco: #ffffff;
+    --texto: #111827;
+    --vermelho: #dc2626;
+    
+    --raio: 12px;
+    --sombra: 0 1px 3px rgba(0,0,0,0.1);
+  }
+
+  html[data-tema="escuro"] {
+    --primaria: #03B885;
+    --primaria-escura: #038554;
+    
+    --cinza-borda: #1f2937;
+    --cinza-texto: #9ca3af;
+    --cinza-fundo: #0f1419;
+    --branco: #1a1f26;
+    --texto: #e5e7eb;
+    --vermelho: #f87171;
+    --sombra: 0 1px 3px rgba(0,0,0,0.4);
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--cinza-fundo);
+    color: var(--texto);
+    min-height: 100vh;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* ===== Header ===== */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--branco);
+    border-bottom: 2px solid var(--primaria);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: var(--sombra);
+  }
+  header h1 {
+    font-size: 18px;
+    margin: 0;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--primaria);
+  }
+  #btn-tema {
+    background: transparent;
+    border: 1px solid var(--cinza-borda);
+    border-radius: 10px;
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+    cursor: pointer;
+    color: var(--texto);
+  }
+
+  /* ===== Formulário ===== */
+  .form-card {
+    background: var(--branco);
+    margin: 12px;
+    padding: 14px;
+    border-radius: var(--raio);
+    box-shadow: var(--sombra);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .form-card .full { grid-column: 1 / -1; }
+  .form-card label {
+    display: block;
+    font-size: 12px;
+    color: var(--cinza-texto);
+    margin-bottom: 4px;
+    font-weight: 500;
+  }
+  .form-card input, .form-card select {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 16px;
+    border: 1px solid var(--cinza-borda);
+    border-radius: 10px;
+    background: var(--branco);
+    color: var(--texto);
+    font-family: inherit;
+  }
+  .form-card input:focus, .form-card select:focus {
+    outline: none;
+    border-color: var(--primaria);
+    box-shadow: 0 0 0 3px rgba(3,133,84,0.2);
+  }
+  .form-card button[type="submit"] {
+    grid-column: 1 / -1;
+    padding: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    background: var(--primaria);
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    margin-top: 6px;
+  }
+  .form-card button[type="submit"]:active { background: var(--primaria-escura); }
+  
+  .combo-group {
+    display: flex;
+    gap: 8px;
+  }
+  .combo-group select { flex: 1; }
+
+  /* ===== Tabela ===== */
+  .tabela-wrap {
+    background: var(--branco);
+    margin: 12px;
+    border-radius: var(--raio);
+    box-shadow: var(--sombra);
+    overflow-x: auto;
+    overflow-y: visible;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    /* Largura mínima para forçar o scroll e manter as colunas alinhadas */
+    min-width: 800px; 
+  }
+  
+  /* Cabeçalho */
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--branco);
+    z-index: 4; /* Acima das células fixas */
+    text-align: left;
+    padding: 10px 8px;
+    border-bottom: 2px solid var(--primaria);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--primaria);
+    white-space: nowrap;
+  }
+
+  /* Células normais */
+  tbody td {
+    padding: 10px 8px;
+    border-bottom: 1px solid var(--cinza-borda);
+    vertical-align: middle;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  
+  /* Descrição (Quebra de linha) */
+  .col-desc { 
+    width: 120px; /* Largura fixa para a primeira coluna */
+    min-width: 120px;
+    white-space: normal; /* Permite quebra de linha */
+    word-wrap: break-word; 
+    overflow-wrap: break-word;
+  }
+  .col-desc strong { display: block; font-weight: 600; line-height: 1.2; }
+
+  /* === COLUNAS FIXAS (STICKY) === */
+  /* 1. Descrição */
+  th:nth-child(1), td:nth-child(1) {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    background: var(--branco);
+  }
+  
+  /* 2. Pagas/Total */
+  th:nth-child(2), td:nth-child(2) {
+    position: sticky;
+    left: 120px; /* Largura da coluna anterior */
+    z-index: 3;
+    background: var(--branco);
+    box-shadow: 2px 0 5px -2px rgba(0,0,0,0.1); /* Sombra indicando scroll */
+  }
+
+  /* 3. Pago (Checkbox) */
+  th:nth-child(3), td:nth-child(3) {
+    position: sticky;
+    left: 220px; /* Largura da col 1 + col 2 */
+    z-index: 3;
+    background: var(--branco);
+    box-shadow: 2px 0 5px -2px rgba(0,0,0,0.1); /* Sombra indicando scroll */
+    text-align: center;
+    width: 60px;
+    min-width: 60px;
+  }
+  
+  /* Checkbox */
+  .chk { width: 22px; height: 22px; cursor: pointer; accent-color: var(--primaria); margin: 0; }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(3, 184, 133, 0.15);
+    color: var(--primaria);
+    font-weight: 600;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .valor { font-weight: 600; white-space: nowrap; }
+  
+  .empty-row td {
+    text-align: center;
+    padding: 24px;
+    color: var(--cinza-texto);
+    font-style: italic;
+    position: static !important; /* Sobrescreve o sticky para a mensagem vazia */
+    box-shadow: none !important;
+  }
+
+  /* Botões de Ação */
+  .acoes-cell {
+    display: flex;
+    gap: 6px;
+  }
+  .btn-acao {
+    background: transparent;
+    border: 1px solid var(--cinza-borda);
+    border-radius: 6px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .btn-acao.editar { color: var(--primaria); }
+  .btn-acao.excluir { color: var(--vermelho); }
+
+  /* ===== Barra de confirmar ===== */
+  .confirm-bar {
+    margin: 0 12px 16px;
+    display: flex;
+    justify-content: flex-end;
+  }
+  #btn-confirmar {
+    padding: 12px 22px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+    background: var(--primaria);
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    box-shadow: var(--sombra);
+  }
+  #btn-confirmar:disabled {
+    background: var(--cinza-borda);
+    color: var(--cinza-texto);
+    cursor: not-allowed;
+  }
+
+  /* ===== Histórico ===== */
+  .historico-card {
+    background: var(--branco);
+    margin: 12px;
+    padding: 14px;
+    border-radius: var(--raio);
+    box-shadow: var(--sombra);
+  }
+  .historico-card h2 {
+    margin: 0 0 10px;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--primaria);
+  }
+  .historico-lista { list-style: none; margin: 0; padding: 0; }
+  .historico-lista li {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--cinza-borda);
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .historico-lista li:last-child { border-bottom: none; }
+  .hist-data {
+    display: block;
+    font-size: 11px;
+    color: var(--cinza-texto);
+    margin-bottom: 2px;
+  }
+  .hist-titulo { font-weight: 600; }
+  .hist-valor { color: var(--primaria); font-weight: 600; }
+  .hist-conclusao { color: var(--primaria-escura); font-weight: 600; }
+
+  /* ===== Configurações ===== */
+  .config-bar {
+    margin: 20px 12px calc(20px + env(safe-area-inset-bottom));
+    text-align: center;
+  }
+  #btn-config {
+    background: transparent;
+    border: 1px solid var(--cinza-borda);
+    color: var(--texto);
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 16px;
+  }
+  .modal-overlay.aberto { display: flex; }
+  .modal {
+    background: var(--branco);
+    border-radius: var(--raio);
+    padding: 20px;
+    width: 100%;
+    max-width: 380px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  }
+  .modal h3 { margin: 0 0 16px; font-size: 17px; color: var(--primaria); }
+  .modal button {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 10px;
+    font-size: 15px;
+    border-radius: 10px;
+    border: 1px solid var(--cinza-borda);
+    background: var(--branco);
+    color: var(--texto);
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .modal button.primario { background: var(--primaria); color: #fff; border: none; }
+  .modal button.perigo { background: var(--vermelho); color: #fff; border: none; }
+  .modal button:last-child { margin-bottom: 0; }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(24px + env(safe-area-inset-bottom));
+    transform: translateX(-50%) translateY(20px);
+    background: var(--primaria-escura);
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 200;
+    max-width: 90vw;
+    text-align: center;
+  }
+  .toast.visivel { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>💸 Minhas Parcelas</h1>
+  <button id="btn-tema" aria-label="Alternar tema"></button>
+</header>
+
+<!-- Formulário -->
+<form class="form-card" id="form-compra" autocomplete="off">
+  <input type="hidden" id="edit-id">
+
+  <div class="full">
+    <label for="in-desc">Descrição</label>
+    <input id="in-desc" type="text" maxlength="60" placeholder="Ex.: Comprar geladeira" required>
+  </div>
+
+  <div>
+    <label for="in-valor">Valor Total (R$)</label>
+    <input id="in-valor" type="text" inputmode="decimal" placeholder="3.000,00" required>
+  </div>
+
+  <div>
+    <label for="in-parcelas">Nº de parcelas</label>
+    <input id="in-parcelas" type="number" min="1" max="120" step="1" inputmode="numeric" placeholder="12" required>
+  </div>
+
+  <div class="full">
+    <label for="in-valor-parcela">Valor da Parcela (R$) <span style="color:var(--primaria);font-weight:bold;font-size:10px;text-transform:uppercase;">(Calculado auto.)</span></label>
+    <input id="in-valor-parcela" type="text" inputmode="decimal" placeholder="250,00" required>
+  </div>
+
+  <div class="full">
+    <label>Início (mês/ano)</label>
+    <div class="combo-group">
+      <select id="in-mes" required>
+        <option value="" disabled selected>Mês</option>
+        <option value="01">Janeiro</option>
+        <option value="02">Fevereiro</option>
+        <option value="03">Março</option>
+        <option value="04">Abril</option>
+        <option value="05">Maio</option>
+        <option value="06">Junho</option>
+        <option value="07">Julho</option>
+        <option value="08">Agosto</option>
+        <option value="09">Setembro</option>
+        <option value="10">Outubro</option>
+        <option value="11">Novembro</option>
+        <option value="12">Dezembro</option>
+      </select>
+      <select id="in-ano" required>
+        <option value="" disabled selected>Ano</option>
+      </select>
+    </div>
+  </div>
+
+  <button type="submit" id="btn-submit">OK</button>
+  <button type="button" id="btn-cancelar-edicao" style="display:none; background: transparent; color: var(--texto); border: 1px solid var(--cinza-borda); margin-top: 6px;">Cancelar Edição</button>
+</form>
+
+<!-- Tabela ativa -->
+<div class="tabela-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Descrição</th>
+        <th>Pagas/Total</th>
+        <th>Pago</th>
+        <th>Valor Total</th>
+        <th>Valor Parcela</th>
+        <th>Início</th>
+        <th>Próx. data</th>
+        <th>Ações</th>
+      </tr>
+    </thead>
+    <tbody id="tbody-ativa">
+      <tr class="empty-row"><td colspan="8">Nenhuma compra cadastrada</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="confirm-bar">
+  <button id="btn-confirmar" disabled>✅ Confirmar pagamento</button>
+</div>
+
+<!-- Histórico -->
+<section class="historico-card">
+  <h2>📜 Histórico</h2>
+  <ul class="historico-lista" id="lista-historico">
+    <li style="color:var(--cinza-texto);font-style:italic;">Nenhum evento registrado</li>
+  </ul>
+</section>
+
+<!-- Configurações -->
+<div class="config-bar">
+  <button id="btn-config">⚙️ Configurações</button>
+</div>
+
+<!-- Modal configurações -->
+<div class="modal-overlay" id="modal-config">
+  <div class="modal">
+    <h3>⚙️ Configurações</h3>
+    <button class="primario" id="btn-exportar">📤 Exportar backup (JSON)</button>
+    <button id="btn-importar">📥 Importar backup (JSON)</button>
+    <input type="file" id="file-import" accept="application/json,.json" hidden>
+    <button id="btn-fechar-config">Fechar</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  'use strict';
+
+  const K_ATIVA = 'parcelas_ativa';
+  const K_HIST  = 'parcelas_historico';
+  const K_TEMA  = 'parcelas_tema';
+
+  let ativa = [];
+  let historico = [];
+
+  const $ = (sel) => document.querySelector(sel);
+  const fmtBRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+  const fmtMes = (ym) => {
+    if (!ym || !/^\d{4}-\d{2}$/.test(ym)) return '—';
+    const [a, m] = ym.split('-');
+    return `${m}/${a}`;
+  };
+  const hojeISO = () => new Date().toISOString();
+  const uid = (p) => p + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+
+  const avancarMes = (ym) => {
+    const [a, m] = ym.split('-').map(Number);
+    const d = new Date(a, m - 1, 1);
+    d.setMonth(d.getMonth() + 1);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  };
+
+  const parseValor = (s) => {
+    if (typeof s === 'number') return s;
+    s = String(s).trim().replace(/\s/g,'');
+    if (!s) return NaN;
+    if (s.includes(',') && s.includes('.')) {
+      s = s.replace(/\./g,'').replace(',', '.');
+    } else if (s.includes(',')) {
+      s = s.replace(',', '.');
+    }
+    const n = parseFloat(s);
+    return isFinite(n) ? n : NaN;
+  };
+
+  const formatarInputValor = (val) => {
+    if (isNaN(val)) return '';
+    return val.toFixed(2).replace('.', ',');
+  };
+
+  function popularAnos() {
+    const selectAno = $('#in-ano');
+    const anoAtual = new Date().getFullYear();
+    for (let i = anoAtual - 5; i <= anoAtual + 10; i++) {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = i;
+      selectAno.appendChild(opt);
+    }
+  }
+
+  function carregar() {
+    try {
+      ativa = JSON.parse(localStorage.getItem(K_ATIVA) || '[]') || [];
+      historico = JSON.parse(localStorage.getItem(K_HIST) || '[]') || [];
+    } catch(e) {
+      ativa = []; historico = [];
+    }
+  }
+  function salvarAtiva() { localStorage.setItem(K_ATIVA, JSON.stringify(ativa)); }
+  function salvarHistorico() { localStorage.setItem(K_HIST, JSON.stringify(historico)); }
+
+  let toastTimer = null;
+  function toast(msg) {
+    const el = $('#toast');
+    el.textContent = msg;
+    el.classList.add('visivel');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('visivel'), 2400);
+  }
+
+  function renderAtiva() {
+    const tbody = $('#tbody-ativa');
+    tbody.innerHTML = '';
+
+    if (ativa.length === 0) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Nenhuma compra cadastrada</td></tr>';
+      atualizarBotaoConfirmar();
+      return;
+    }
+
+    ativa.forEach(item => {
+      const tr = document.createElement('tr');
+      tr.dataset.id = item.id;
+
+      const restantes = item.totalParcelas - item.parcelasPagas;
+      const badgeTxt = `${item.parcelasPagas}/${item.totalParcelas}`;
+
+      tr.innerHTML = `
+        <td class="col-desc"><strong></strong></td>
+        <td>
+          <span class="badge">${badgeTxt}</span> 
+          <span style="color:var(--cinza-texto);font-size:11px;display:block;margin-top:4px;">(faltam ${restantes})</span>
+        </td>
+        <td>
+          <input type="checkbox" class="chk" data-id="${item.id}" aria-label="Marcar parcela paga de ${item.descricao}">
+        </td>
+        <td class="valor">${fmtBRL.format(item.valorTotal)}</td>
+        <td class="valor">${fmtBRL.format(item.valorParcela)}</td>
+        <td>${fmtMes(item.dataInicio)}</td>
+        <td>${fmtMes(item.proximaData)}</td>
+        <td class="acoes-cell">
+          <button class="btn-acao editar" data-id="${item.id}" title="Editar">✏️</button>
+          <button class="btn-acao excluir" data-id="${item.id}" title="Excluir">🗑️</button>
+        </td>
+      `;
+      tr.querySelector('strong').textContent = item.descricao;
+      tbody.appendChild(tr);
+    });
+
+    atualizarBotaoConfirmar();
+  }
+
+  function atualizarBotaoConfirmar() {
+    const algumMarcado = document.querySelectorAll('#tbody-ativa .chk:checked').length > 0;
+    $('#btn-confirmar').disabled = !algumMarcado;
+  }
+
+  function renderHistorico() {
+    const ul = $('#lista-historico');
+    ul.innerHTML = '';
+
+    if (historico.length === 0) {
+      ul.innerHTML = '<li style="color:var(--cinza-texto);font-style:italic;">Nenhum evento registrado</li>';
+      return;
+    }
+
+    const ordenado = [...historico].sort((a,b) =>
+      (b.dataPagamento || '').localeCompare(a.dataPagamento || '')
+    );
+
+    ordenado.forEach(h => {
+      const li = document.createElement('li');
+      const dataFmt = new Date(h.dataPagamento).toLocaleString('pt-BR', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+
+      if (h.tipo === 'conclusao') {
+        li.innerHTML = `
+          <span class="hist-data">${dataFmt}</span>
+          <span class="hist-titulo"></span>
+          <span class="hist-conclusao"> — Concluída (${h.totalParcelas}/${h.totalParcelas})</span>
+        `;
+      } else {
+        li.innerHTML = `
+          <span class="hist-data">${dataFmt}</span>
+          <span class="hist-titulo"></span>
+          <span> — Parcela ${h.parcelaNumero}/${h.totalParcelas} paga</span>
+          <span class="hist-valor"> ${fmtBRL.format(h.valorParcela)}</span>
+        `;
+      }
+      li.querySelector('.hist-titulo').textContent = h.descricao;
+      ul.appendChild(li);
+    });
+  }
+
+  function calcularValorParcela() {
+    const valorTotal = parseValor($('#in-valor').value);
+    const parcelas = parseInt($('#in-parcelas').value, 10);
+    
+    if (Number.isFinite(valorTotal) && valorTotal > 0 && Number.isInteger(parcelas) && parcelas > 0) {
+      const valorParcela = valorTotal / parcelas;
+      $('#in-valor-parcela').value = formatarInputValor(valorParcela);
+    }
+  }
+
+  $('#in-valor').addEventListener('input', calcularValorParcela);
+  $('#in-parcelas').addEventListener('input', calcularValorParcela);
+
+  $('#form-compra').addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    
+    const editId = $('#edit-id').value;
+    const desc = $('#in-desc').value.trim();
+    const total = parseInt($('#in-parcelas').value, 10);
+    const valorTotal = parseValor($('#in-valor').value);
+    const valorParcela = parseValor($('#in-valor-parcela').value);
+    const mes = $('#in-mes').value;
+    const ano = $('#in-ano').value;
+
+    if (!desc) { toast('Informe a descrição'); return; }
+    if (!Number.isInteger(total) || total < 1) { toast('Nº de parcelas inválido'); return; }
+    if (!Number.isFinite(valorTotal) || valorTotal <= 0) { toast('Valor total inválido'); return; }
+    if (!Number.isFinite(valorParcela) || valorParcela <= 0) { toast('Valor da parcela inválido'); return; }
+    if (!mes || !ano) { toast('Informe mês e ano de início'); return; }
+
+    const inicio = `${ano}-${mes}`;
+
+    if (editId) {
+      const item = ativa.find(x => x.id === editId);
+      if (item) {
+        item.descricao = desc;
+        item.totalParcelas = total;
+        item.valorTotal = Math.round(valorTotal * 100) / 100;
+        item.valorParcela = Math.round(valorParcela * 100) / 100;
+        item.dataInicio = inicio;
+        
+        let prox = inicio;
+        for (let i = 0; i < item.parcelasPagas; i++) {
+          prox = avancarMes(prox);
+        }
+        item.proximaData = prox;
+
+        toast('Compra atualizada');
+      }
+      cancelarEdicao();
+    } else {
+      const novo = {
+        id: uid('p'),
+        descricao: desc,
+        totalParcelas: total,
+        parcelasPagas: 0,
+        valorTotal: Math.round(valorTotal * 100) / 100,
+        valorParcela: Math.round(valorParcela * 100) / 100,
+        dataInicio: inicio,
+        proximaData: inicio,
+        criadoEm: hojeISO()
+      };
+
+      ativa.push(novo);
+      toast('Compra adicionada');
+      
+      $('#in-desc').value = '';
+      $('#in-parcelas').value = '';
+      $('#in-valor').value = '';
+      $('#in-valor-parcela').value = '';
+      $('#in-desc').focus();
+    }
+
+    salvarAtiva();
+    renderAtiva();
+  });
+
+  $('#tbody-ativa').addEventListener('click', (ev) => {
+    const btn = ev.target.closest('.btn-acao');
+    if (!btn) return;
+
+    const id = btn.dataset.id;
+
+    if (btn.classList.contains('editar')) {
+      const item = ativa.find(x => x.id === id);
+      if (!item) return;
+
+      $('#edit-id').value = item.id;
+      $('#in-desc').value = item.descricao;
+      $('#in-valor').value = formatarInputValor(item.valorTotal);
+      $('#in-parcelas').value = item.totalParcelas;
+      $('#in-valor-parcela').value = formatarInputValor(item.valorParcela);
+      
+      const [ano, mes] = item.dataInicio.split('-');
+      $('#in-mes').value = mes;
+      $('#in-ano').value = ano;
+
+      $('#btn-submit').textContent = 'Salvar Alterações';
+      $('#btn-cancelar-edicao').style.display = 'block';
+      
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    if (btn.classList.contains('excluir')) {
+      if (confirm('Tem certeza que deseja excluir esta compra?')) {
+        ativa = ativa.filter(x => x.id !== id);
+        salvarAtiva();
+        renderAtiva();
+        toast('Compra excluída');
+      }
+    }
+  });
+
+  function cancelarEdicao() {
+    $('#edit-id').value = '';
+    $('#form-compra').reset();
+    $('#btn-submit').textContent = 'OK';
+    $('#btn-cancelar-edicao').style.display = 'none';
+    $('#in-desc').focus();
+  }
+
+  $('#btn-cancelar-edicao').addEventListener('click', cancelarEdicao);
+
+  document.addEventListener('change', (ev) => {
+    if (ev.target.classList.contains('chk')) {
+      atualizarBotaoConfirmar();
+    }
+  });
+
+  $('#btn-confirmar').addEventListener('click', () => {
+    const marcados = [...document.querySelectorAll('#tbody-ativa .chk:checked')];
+    if (marcados.length === 0) return;
+
+    if (!confirm(`Confirmar pagamento de ${marcados.length} parcela(s)?`)) return;
+
+    const agora = hojeISO();
+    const idsParaRemover = [];
+
+    marcados.forEach(chk => {
+      const id = chk.dataset.id;
+      const item = ativa.find(x => x.id === id);
+      if (!item) return;
+
+      const parcelaNumero = item.parcelasPagas + 1;
+      const dataRef = item.proximaData;
+
+      historico.push({
+        id: uid('h'),
+        compraId: item.id,
+        descricao: item.descricao,
+        parcelaNumero,
+        totalParcelas: item.totalParcelas,
+        valorParcela: item.valorParcela,
+        dataPagamento: agora,
+        dataReferencia: dataRef,
+        tipo: 'pagamento'
+      });
+
+      item.parcelasPagas += 1;
+      item.proximaData = avancarMes(item.proximaData);
+
+      if (item.parcelasPagas >= item.totalParcelas) {
+        historico.push({
+          id: uid('h'),
+          compraId: item.id,
+          descricao: item.descricao,
+          parcelaNumero: item.totalParcelas,
+          totalParcelas: item.totalParcelas,
+          valorParcela: item.valorParcela,
+          dataPagamento: agora,
+          dataReferencia: dataRef,
+          tipo: 'conclusao'
+        });
+        idsParaRemover.push(item.id);
+      }
+    });
+
+    ativa = ativa.filter(x => !idsParaRemover.includes(x.id));
+
+    salvarAtiva();
+    salvarHistorico();
+    renderAtiva();
+    renderHistorico();
+    toast(`Pagamento confirmado (${marcados.length} parcela${marcados.length>1?'s':''})`);
+  });
+
+  function temaAtual() {
+    return document.documentElement.getAttribute('data-tema') === 'escuro' ? 'escuro' : 'claro';
+  }
+  function atualizarIconeTema() {
+    $('#btn-tema').textContent = temaAtual() === 'escuro' ? '☀️' : '🌙';
+  }
+  function aplicarTema(t) {
+    document.documentElement.setAttribute('data-tema', t);
+    try { localStorage.setItem(K_TEMA, t); } catch(e) {}
+    atualizarIconeTema();
+  }
+  $('#btn-tema').addEventListener('click', () => {
+    aplicarTema(temaAtual() === 'escuro' ? 'claro' : 'escuro');
+  });
+
+  const modal = $('#modal-config');
+  $('#btn-config').addEventListener('click', () => modal.classList.add('aberto'));
+  $('#btn-fechar-config').addEventListener('click', () => modal.classList.remove('aberto'));
+  modal.addEventListener('click', (ev) => {
+    if (ev.target === modal) modal.classList.remove('aberto');
+  });
+
+  $('#btn-exportar').addEventListener('click', () => {
+    const backup = {
+      versao: 1,
+      exportadoEm: hojeISO(),
+      ativa,
+      historico
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const dt = new Date();
+    const stamp = `${dt.getFullYear()}${String(dt.getMonth()+1).padStart(2,'0')}${String(dt.getDate()).padStart(2,'0')}`;
+    a.href = url;
+    a.download = `parcelas-backup-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('Backup exportado');
+  });
+
+  $('#btn-importar').addEventListener('click', () => $('#file-import').click());
+
+  $('#file-import').addEventListener('change', (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (!data || !Array.isArray(data.ativa) || !Array.isArray(data.historico)) {
+          toast('Arquivo inválido'); return;
+        }
+        
+        const ativaOk = data.ativa.every(x =>
+          x && typeof x.id === 'string' && typeof x.descricao === 'string' &&
+          Number.isInteger(x.totalParcelas) && Number.isInteger(x.parcelasPagas) &&
+          Number.isFinite(x.valorParcela) && typeof x.dataInicio === 'string' && typeof x.proximaData === 'string'
+        );
+        const histOk = data.historico.every(x =>
+          x && typeof x.id === 'string' && typeof x.descricao === 'string' &&
+          typeof x.dataPagamento === 'string' && (x.tipo === 'pagamento' || x.tipo === 'conclusao')
+        );
+        if (!ativaOk || !histOk) { toast('Dados do backup inválidos'); return; }
+
+        if (!confirm(`Substituir os dados atuais por este backup?\n\nAtiva: ${data.ativa.length} item(s)\nHistórico: ${data.historico.length} evento(s)`)) return;
+
+        ativa = data.ativa;
+        historico = data.historico;
+        salvarAtiva();
+        salvarHistorico();
+        renderAtiva();
+        renderHistorico();
+        modal.classList.remove('aberto');
+        toast('Backup importado com sucesso');
+      } catch(e) {
+        toast('Erro ao ler o arquivo');
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  popularAnos();
+  carregar();
+  renderAtiva();
+  renderHistorico();
+  atualizarIconeTema();
+  
+  $('#in-desc').focus();
+})();
+</script>
+</body>
+</html>
