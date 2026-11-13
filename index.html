@@ -239,6 +239,11 @@
     font-style: italic;
   }
 
+  .acoes-cell {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+  }
   .btn-acao {
     background: transparent;
     border: 1px solid var(--cinza-borda);
@@ -249,6 +254,7 @@
     color: var(--texto);
   }
   .btn-acao.editar { color: var(--primaria); border-color: var(--primaria); }
+  .btn-acao.excluir { color: var(--vermelho); border-color: var(--vermelho); }
 
   /* ===== Modais ===== */
   .modal-overlay {
@@ -314,7 +320,7 @@
   .modal button.laranja { background: var(--laranja); color: #fff; border: none; }
   .modal button:last-child { margin-bottom: 0; }
 
-  /* Lista de Compras no Modal */
+  /* Lista de Itens no Modal */
   .lista-compras {
     max-height: 60vh;
     overflow-y: auto;
@@ -530,6 +536,17 @@
   </div>
 </div>
 
+<!-- NOVO: Modal de Edição/Exclusão de Manuais -->
+<div class="modal-overlay" id="modal-manuais">
+  <div class="modal">
+    <h3 id="manuais-titulo">Gerenciar Lançamentos Manuais</h3>
+    <div class="lista-compras" id="lista-manuais">
+      <!-- Injetado via JS -->
+    </div>
+    <button id="btn-fechar-manuais">Fechar</button>
+  </div>
+</div>
+
 <!-- Modal de Edição de Compra -->
 <div class="modal-overlay" id="modal-edit-compra">
   <div class="modal">
@@ -595,6 +612,7 @@
   let manuais = [];
   let anotacoes = {};
   let mesAnoAtualEditando = null;
+  let mesAnoAtualManuais = null; // Para o modal de manuais
 
   const $ = (sel) => document.querySelector(sel);
   const fmtBRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -702,7 +720,6 @@
           if (!mapa[chave]) mapa[chave] = { ano: a, mes: m, valor: 0, descricoes: [] };
           
           mapa[chave].valor += c.valorParcela;
-          // ADIÇÃO DO VALOR DA PARCELA NA DESCRIÇÃO
           mapa[chave].descricoes.push(`${c.descricao} (${i}/${c.totalParcelas}) - Total: ${fmtBRL.format(c.valorTotal)} | Parcela: ${fmtBRL.format(c.valorParcela)}`);
         }
         m++;
@@ -748,8 +765,11 @@
           ${isAtual ? '<br><span style="font-size:10px;color:var(--primaria);text-transform:uppercase;">Mês Atual</span>' : ''}
         </td>
         <td class="valor">${fmtBRL.format(item.valor)}</td>
-        <td style="text-align:right;">
-          <button class="btn-acao editar" data-chave="${item.ano}-${item.mes}">Detalhes</button>
+        <td>
+          <div class="acoes-cell">
+            <button class="btn-acao editar" data-chave="${item.ano}-${item.mes}" data-acao="detalhes">Detalhes</button>
+            <button class="btn-acao editar" data-chave="${item.ano}-${item.mes}" data-acao="editar-manuais" title="Gerenciar manuais">✏️</button>
+          </div>
         </td>
       `;
       tbody.appendChild(tr);
@@ -852,33 +872,118 @@
     toast('Valor adicionado ao mês!');
   });
 
+  // ===== Ações na Tabela (Detalhes / Gerenciar Manuais) =====
   $('#tbody-meses').addEventListener('click', (ev) => {
     const btn = ev.target.closest('.btn-acao');
     if (!btn) return;
 
     const chave = btn.dataset.chave;
+    const acao = btn.dataset.acao;
     const [ano, mes] = chave.split('-');
     
-    mesAnoAtualEditando = chave;
-    const textoManual = anotacoes[chave] || '';
+    if (acao === 'detalhes') {
+      mesAnoAtualEditando = chave;
+      const textoManual = anotacoes[chave] || '';
 
-    const agrupados = obterMesesAgrupados();
-    const mesDados = agrupados.find(x => x.ano == ano && x.mes == mes);
-    const descricoesAuto = mesDados ? mesDados.descricoes : [];
+      const agrupados = obterMesesAgrupados();
+      const mesDados = agrupados.find(x => x.ano == ano && x.mes == mes);
+      const descricoesAuto = mesDados ? mesDados.descricoes : [];
 
-    let textoFinal = '';
-    if (descricoesAuto.length > 0) {
-      textoFinal += "--- Compras Parceladas ---\n" + descricoesAuto.join('\n') + "\n\n";
+      let textoFinal = '';
+      if (descricoesAuto.length > 0) {
+        textoFinal += "--- Compras Parceladas ---\n" + descricoesAuto.join('\n') + "\n\n";
+      }
+      if (textoManual) {
+        textoFinal += "--- Anotações Extras ---\n" + textoManual;
+      }
+
+      $('#detalhes-titulo').textContent = `Detalhes: ${getMesNome(mes)} / ${ano}`;
+      $('#detalhes-texto').value = textoFinal;
+      $('#modal-detalhes').classList.add('aberto');
+    } 
+    else if (acao === 'editar-manuais') {
+      mesAnoAtualManuais = chave;
+      renderListaManuais(chave, mes, ano);
+      $('#modal-manuais').classList.add('aberto');
     }
-    if (textoManual) {
-      textoFinal += "--- Anotações Extras ---\n" + textoManual;
-    }
-
-    $('#detalhes-titulo').textContent = `Detalhes: ${getMesNome(mes)} / ${ano}`;
-    $('#detalhes-texto').value = textoFinal;
-    $('#modal-detalhes').classList.add('aberto');
   });
 
+  // ===== Modal de Manuais =====
+  function renderListaManuais(chave, mes, ano) {
+    const lista = $('#lista-manuais');
+    lista.innerHTML = '';
+    
+    const filtrados = manuais.filter(m => m.ano == ano && m.mes == mes);
+
+    if (filtrados.length === 0) {
+      lista.innerHTML = '<p style="text-align:center;color:var(--cinza-texto);">Nenhum lançamento manual neste mês.</p>';
+      return;
+    }
+
+    $('#manuais-titulo').textContent = `Manuais: ${getMesNome(mes)} / ${ano}`;
+
+    filtrados.forEach(m => {
+      const div = document.createElement('div');
+      div.className = 'compra-item';
+      
+      div.innerHTML = `
+        <div class="compra-item-header">
+          <span>Lançamento Manual</span>
+          <span>${fmtBRL.format(m.valor)}</span>
+        </div>
+        <div class="compra-acoes" style="margin-top: 8px;">
+          <button class="btn-acao editar" data-id="${m.id}" data-acao="editar-manual">✏️ Editar</button>
+          <button class="btn-acao excluir" data-id="${m.id}" data-acao="excluir-manual">🗑️ Excluir</button>
+        </div>
+      `;
+      lista.appendChild(div);
+    });
+  }
+
+  $('#lista-manuais').addEventListener('click', (ev) => {
+    const btn = ev.target.closest('button');
+    if (!btn) return;
+
+    const id = btn.dataset.id;
+    const acao = btn.dataset.acao;
+    const item = manuais.find(m => m.id === id);
+    if (!item) return;
+
+    if (acao === 'excluir-manual') {
+      if (confirm('Tem certeza que deseja excluir este lançamento manual?')) {
+        manuais = manuais.filter(m => m.id !== id);
+        salvar();
+        renderTabela();
+        
+        // Atualiza a lista no modal
+        const [ano, mes] = mesAnoAtualManuais.split('-');
+        renderListaManuais(mesAnoAtualManuais, mes, ano);
+        toast('Lançamento excluído');
+      }
+    } 
+    else if (acao === 'editar-manual') {
+      const novoValorStr = prompt("Digite o novo valor (R$):", formatarInputValor(item.valor));
+      if (novoValorStr !== null) {
+        const novoValor = parseValor(novoValorStr);
+        if (Number.isFinite(novoValor) && novoValor > 0) {
+          item.valor = novoValor;
+          salvar();
+          renderTabela();
+          
+          // Atualiza a lista no modal
+          const [ano, mes] = mesAnoAtualManuais.split('-');
+          renderListaManuais(mesAnoAtualManuais, mes, ano);
+          toast('Lançamento atualizado');
+        } else {
+          toast('Valor inválido');
+        }
+      }
+    }
+  });
+
+  $('#btn-fechar-manuais').addEventListener('click', () => $('#modal-manuais').classList.remove('aberto'));
+
+  // ===== Salvar Detalhes (Textarea) =====
   $('#btn-salvar-detalhes').addEventListener('click', () => {
     if (!mesAnoAtualEditando) return;
     let texto = $('#detalhes-texto').value;
@@ -897,6 +1002,7 @@
 
   $('#btn-fechar-detalhes').addEventListener('click', () => $('#modal-detalhes').classList.remove('aberto'));
 
+  // ===== Gestão de Compras Parceladas =====
   const modalCompras = $('#modal-compras');
   const modalEditCompra = $('#modal-edit-compra');
   const modalQuitar = $('#modal-quitar');
